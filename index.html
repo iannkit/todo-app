@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>To-Do</title><style>
+:root{--bg:#f5f5f7;--card:#fff;--fg:#1d1d1f;--mut:#888;--bd:#e5e5ea;--acc:#0071e3;--over:#fff1f0;--tod:#fffbe6}
+.dark{--bg:#0e0e10;--card:#1a1a1e;--fg:#eee;--mut:#888;--bd:#2c2c32;--acc:#5e9bff;--over:#3a1d1d;--tod:#33301a}
+*{box-sizing:border-box}body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:28px 12px}
+.app{max-width:600px;margin:auto;background:var(--card);border-radius:16px;padding:20px;box-shadow:0 4px 24px #0001}
+h1{font-size:20px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center}
+.sm{font-size:12px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:4px 8px;cursor:pointer;margin-left:4px}
+input,select{padding:9px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--card);color:var(--fg)}
+form{display:flex;flex-wrap:wrap;gap:6px}#i{flex:1 1 100%}#tag,#due,#pri{flex:1;min-width:90px}
+form button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:0 16px}
+#q{width:100%;margin-top:10px}.bar{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.chip{font-size:12px;border:1px solid var(--bd);border-radius:20px;padding:3px 10px;background:var(--card);color:var(--fg);cursor:pointer}.chip.on{background:var(--fg);color:var(--card)}
+ul{list-style:none;padding:0;margin:0}li{display:flex;gap:8px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--bd);flex-wrap:wrap;border-left:3px solid transparent}
+li.p2{border-left-color:#ff3b30}li.p1{border-left-color:#ff9500}li.drag{opacity:.4}
+.tx{flex:1;min-width:120px;cursor:text}li.d .tx b{text-decoration:line-through;color:var(--mut);font-weight:400}b{font-weight:400}
+li.over{background:var(--over)}li.today{background:var(--tod)}.meta{font-size:11px;color:var(--mut)}
+.st{font-size:11px;border:0;border-radius:6px;padding:2px 7px;cursor:pointer;color:#fff}.s0{background:#999}.s1{background:#8e5cf7}.s2{background:#ff9500}.s3{background:#0071e3}.s4{background:#34c759}
+.ic{border:0;background:none;color:var(--mut);font-size:16px;cursor:pointer}.h{cursor:grab;color:var(--mut)}
+.ed{flex:1;min-width:120px}.foot{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}.foot button{border:0;background:none;color:var(--mut);cursor:pointer}
+#timer{display:none;margin-top:12px;padding:10px;border-radius:10px;background:#1d1d1f;color:#fff;font-size:14px;justify-content:space-between;align-items:center}#timer button{background:#333;color:#fff;border:0;border-radius:6px;padding:4px 8px;margin-left:4px}
+</style></head><body><div class=app>
+<h1>To-Do <span><button class=sm id=th>◐</button><button class=sm id=ex>Export</button><label class=sm>Import<input id=im type=file accept=.json hidden></label></span></h1>
+<form id=f><input id=i placeholder="Add a task…" autocomplete=off><input id=tag placeholder="Project / client"><input id=due type=date><select id=pri><option value=0>Low</option><option value=1 selected>Med</option><option value=2>High</option></select><button>Add</button></form>
+<input id=q placeholder="Search…" type=search>
+<div class=bar id=bar></div><div class=bar id=tags></div><ul id=l></ul>
+<div class=foot><span id=cnt></span><button id=cc>Clear completed</button></div>
+<div id=timer><span id=tt></span><span><button id=tp>Pause</button><button id=ts>Stop</button></span></div></div>
+<script>
+const K='todo_app',ST=['Idea','Script','Shoot','Edit','Post'],PR=['Low','Med','High'];
+let t=JSON.parse(localStorage.getItem(K)||'[]'),flt='All',tagF='',edit=null,dragId=null;
+const $=id=>document.getElementById(id),s=()=>localStorage.setItem(K,JSON.stringify(t));
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+if(localStorage.getItem(K+'_theme')=='dark')document.body.classList.add('dark');
+$('th').onclick=()=>{const d=document.body.classList.toggle('dark');localStorage.setItem(K+'_theme',d?'dark':'light')};
+function r(){const td=today(),q=$('q').value.trim().toLowerCase(),tags=[...new Set(t.map(x=>x.tag).filter(Boolean))];
+ if(tagF&&!tags.includes(tagF))tagF='';
+ $('bar').innerHTML=['All','Active','Completed','Today'].map(g=>`<button class="chip ${g==flt?'on':''}" data-f="${g}">${g}</button>`).join('');
+ $('tags').innerHTML=tags.length?tags.map(g=>`<button class="chip ${g==tagF?'on':''}" data-t="${esc(g)}"># ${esc(g)}</button>`).join(''):'';
+ const v=t.filter(x=>(flt=='All'||(flt=='Active'&&!x.done)||(flt=='Completed'&&x.done)||(flt=='Today'&&x.due&&x.due<=td&&!x.done))&&(!tagF||x.tag==tagF)&&(!q||(x.text+' '+x.tag).toLowerCase().includes(q)));
+ $('l').innerHTML=v.map(x=>{const c=(x.done?'d':x.due&&x.due<td?'over':x.due==td?'today':'')+' p'+x.pri;
+ const body=edit==x.id?`<input class=ed id=edi value="${esc(x.text)}">`:`<span class=tx data-a=ed data-id=${x.id}><b>${esc(x.text)}</b><br><span class=meta>${PR[x.pri]}${x.tag?' · #'+esc(x.tag):''}${x.due?' · '+(x.due<td&&!x.done?'overdue ':'')+x.due:''}</span></span>`;
+ return `<li class="${c}" draggable=true data-id=${x.id}><span class=h>⋮⋮</span><input type=checkbox ${x.done?'checked':''} data-a=tg data-id=${x.id}>${body}<button class="st s${x.st}" data-a=st data-id=${x.id} title="Click to advance">${ST[x.st]}</button><button class=ic data-a=tm data-id=${x.id} title="Focus 25 min">⏱</button><button class=ic data-a=dl data-id=${x.id} title=Delete>×</button></li>`}).join('');
+ const n=t.filter(x=>!x.done).length;$('cnt').textContent=n+(n==1?' item':' items')+' left';
+ const e=$('edi');if(e){e.focus();e.onkeydown=k=>{if(k.key=='Enter')e.blur();if(k.key=='Escape'){edit=null;r()}};e.onblur=()=>{if(edit==null)return;const x=t.find(y=>y.id==edit),v=e.value.trim();edit=null;if(v)x.text=v;else t=t.filter(y=>y!==x);s();r()}}}
+$('f').onsubmit=e=>{e.preventDefault();const v=$('i').value.trim();if(!v)return;t.push({id:Date.now()+Math.random(),text:v,done:false,tag:$('tag').value.trim(),due:$('due').value,pri:+$('pri').value,st:0});$('i').value='';s();r()};
+$('q').oninput=r;
+$('bar').onclick=e=>{if(e.target.dataset.f){flt=e.target.dataset.f;r()}};
+$('tags').onclick=e=>{const g=e.target.dataset.t;if(g!=null){tagF=tagF==g?'':g;r()}};
+$('l').onclick=e=>{const a=e.target.dataset.a,id=+e.target.dataset.id;if(!a||a=='ed')return;const x=t.find(y=>y.id==id);if(!x)return;
+ if(a=='tg')x.done=!x.done;if(a=='st')x.st=(x.st+1)%5;if(a=='dl')t=t.filter(y=>y.id!=id);if(a=='tm')startT(x);s();r()};
+$('l').ondblclick=e=>{const el=e.target.closest('.tx');if(el){edit=+el.dataset.id;r()}};
+$('cc').onclick=()=>{t=t.filter(x=>!x.done);s();r()};
+$('l').ondragstart=e=>{const li=e.target.closest('li');if(!li)return;dragId=+li.dataset.id;li.classList.add('drag')};
+$('l').ondragover=e=>e.preventDefault();
+$('l').ondrop=e=>{e.preventDefault();const li=e.target.closest('li');if(!li||dragId==null)return;const to=+li.dataset.id;if(to!=dragId){const a=t.findIndex(x=>x.id==dragId),it=t.splice(a,1)[0];t.splice(t.findIndex(x=>x.id==to)+(a<=t.findIndex(x=>x.id==to)?1:0),0,it);s()}dragId=null;r()};
+$('l').ondragend=()=>{dragId=null;r()};
+let left=0,run=null,tname='';
+function show(){const m=String(Math.floor(left/60)).padStart(2,'0'),sec=String(left%60).padStart(2,'0');$('tt').textContent=`⏱ ${m}:${sec} — ${tname}`;document.title=`${m}:${sec} To-Do`}
+function tick(){left--;show();if(left<=0){stopT();alert('Focus session done: '+tname)}}
+function startT(x){clearInterval(run);tname=x.text;left=1500;$('timer').style.display='flex';$('tp').textContent='Pause';show();run=setInterval(tick,1000)}
+function stopT(){clearInterval(run);run=null;$('timer').style.display='none';document.title='To-Do'}
+$('tp').onclick=()=>{if(run){clearInterval(run);run=null;$('tp').textContent='Resume'}else{run=setInterval(tick,1000);$('tp').textContent='Pause'}};
+$('ts').onclick=stopT;
+$('ex').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(t,null,2)],{type:'application/json'}));a.download='tasks-'+today()+'.json';a.click()};
+$('im').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(j=>{try{const d=JSON.parse(j);if(!Array.isArray(d))throw 0;t=d.map((x,i)=>({id:+x.id||Date.now()+i,text:String(x.text||''),done:!!x.done,tag:x.tag||'',due:x.due||'',pri:[0,1,2].includes(+x.pri)?+x.pri:1,st:Math.min(4,Math.max(0,+x.st||0))}));s();r()}catch(_){alert('Invalid JSON file')}});e.target.value=''};
+r();
+</script></body></html>
